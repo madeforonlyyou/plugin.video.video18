@@ -104,17 +104,16 @@ class MShare(IG):
     def __init__(self):
         super(MShare, self).__init__()
         self.site = 'http://mastishare.com/'
-        self.config_url = 'http://www.mastishare.com/media/player/config_embed.php?vkey=%s'
+        self.config_url = 'http://www.mastishare.com/media/nuevo/playlist.php?key=%s'
 
     def get_download_url(self, text):
         """ gets the url from the xml"""
         try:
             xmldoc = minidom.parseString(text)
-            src = xmldoc.getElementsByTagName('src')
+            src = xmldoc.getElementsByTagName('file')
             thumb = xmldoc.getElementsByTagName('image')
-            title = xmldoc.getElementsByTagName('share')
-            title = os.path.basename(title[0].firstChild.data)
-            title = title.replace('-', ' ')
+            title = xmldoc.getElementsByTagName('title')
+            title = title[0].firstChild.data
         except Exception as e:
             plugin.log.debug('Cannot download video: config.php error: %s', e)
             return []
