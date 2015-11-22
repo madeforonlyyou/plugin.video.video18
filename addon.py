@@ -52,10 +52,13 @@ def show_video(vidpage):
 def get_site_category(site):
     cat = []
     if (site == 'indiangilma.com' or site == 'pornfay.com' or
-        site == 'mastishare.com'):
+            site == 'mastishare.com'):
         categories = {'Most Recent': 'http://www.%s/videos?o=mr' % site,
-                      'Top Favs': 'http://www.%s/videos?o=tf' % site,
-                      'Longest': 'http://www.%s/videos?o=lg' % site}
+                      'Being Watched': 'http://%s/videos?o=bw' % site,
+                      'Most viewed': 'http://www.%s/videos?o=mv' % site,
+                      'Longest': 'http://www.%s/videos?o=lg' % site,
+                      'Top Favorites': 'http://www.%s/videos?o=tf' % site,
+                      'Top Rated': 'http://www.%s/videos?o=tr' % site}
 
         for label, path in categories.items():
             cat.append({'label': label,
@@ -65,17 +68,18 @@ def get_site_category(site):
         items, next_page = download_index_page(site)
         for item in items:
             cat.append({'label': item['label'],
-                        'path': plugin.url_for('show_video', vidpage=item['path']),
+                        'path': plugin.url_for('show_video',
+                                               vidpage=item['path']),
                         'thumbnail': item['thumbnail'],
                         'is_playable': False})
         next_page_item = {'label': 'Next Page',
-                          'path': plugin.url_for('show_category',cat=next_page),
+                          'path': plugin.url_for('show_category',
+                                                 cat=next_page),
                           'is_playable': False
                           }
         cat.append(next_page_item)
 
     return cat
-
 
 
 if __name__ == '__main__':
