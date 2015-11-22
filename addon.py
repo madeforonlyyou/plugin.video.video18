@@ -1,6 +1,6 @@
 from xbmcswift2 import Plugin
 from xbmcswift2 import logger
-from scrapper import download_video_page, download_index_page
+from scrapper import download_video_page, download_index_page, get_categories
 
 
 SUPPORTED_SITES = ['pornfay.com', 'indiangilma.com', 'mastishare.com',
@@ -49,6 +49,16 @@ def show_video(vidpage):
         return plugin.finish(item)
 
 
+def get_generes(site):
+    items = []
+    category_index_url = 'http://www.%s/categories' % site
+    items = get_categories(category_index_url)
+    if items:
+        for item in items:
+            item['path'] = plugin.url_for('show_category', cat=item['path'])
+    return items
+
+
 def get_site_category(site):
     cat = []
     if (site == 'indiangilma.com' or site == 'pornfay.com' or
@@ -64,6 +74,8 @@ def get_site_category(site):
             cat.append({'label': label,
                         'path': plugin.url_for('show_category', cat=path),
                         'is_playable': False})
+        items = get_generes(site)
+        cat = cat + items
     elif site == 'http://indiansexmms.co/':
         items, next_page = download_index_page(site)
         for item in items:

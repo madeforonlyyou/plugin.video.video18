@@ -1,8 +1,6 @@
-from xbmcswift2 import logger
 from xbmcswift2 import Plugin
 from xml.dom import minidom
 import re
-import os
 import requests
 from requests.utils import urlparse, urlunparse
 from urlparse import parse_qs
@@ -11,14 +9,15 @@ from BeautifulSoup import BeautifulSoup
 
 plugin = Plugin()
 
-headers = {'User-Agent': 'Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:41.0) Gecko/20100101 Firefox/41.0',
+headers = {'User-Agent': 'Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:41.0) '
+                         'Gecko/20100101 Firefox/41.0',
            'Accept-Encoding': 'identity, deflate'}
+
 
 class Scrapper(object):
     def __init__(self):
         self.req = requests.session()
         self.req.headers.update(headers)
-
 
     def download_page(self, url, **kwargs):
         """ uses to get the xml source from website """
@@ -59,6 +58,19 @@ class IG(Scrapper):
                           'thumbnail': self.site + div('a')[0]('img')[0]['src'],
                           'is_playable': False})
         return items, urlunparse(self.get_next_page(url, bs))
+
+    def category_page(self, url):
+        items = []
+        code, page =self.download_page(url)
+        if code == 200:
+            bs = BeautifulSoup(page)
+            divs = bs.findAll('div', {'class': "col-sm-6 col-md-4 col-lg-4 m-b-20"})
+            for div in divs:
+                items.append({'label': div('a')[0]('div')[0]('img')[0]['title'],
+                              'path': self.site + div('a')[0]['href'],
+                              'thumbnail': self.site + div('a')[0]('div')[0]('img')[0]['src'],
+                              'is_playable': False})
+        return items
 
 
     def get_download_url(self, text):
@@ -122,9 +134,21 @@ class MShare(IG):
                 'label': title,
                 'is_playable': True,
                 }
-        plugin.log.debug(item)
         return item
 
+
+    def category_page(self, url):
+        items = []
+        code, page =self.download_page(url)
+        if code == 200:
+            bs = BeautifulSoup(page)
+            h2_divs = bs.findAll('div', {'class': "btopl"})
+            path_divs = bs.findAll('div', {'class': 'btopr'})
+            for i in range(0, len(h2_divs)):
+                items.append({'label': h2_divs[i]('h2')[0].text,
+                              'path': self.site + path_divs[i]('a')[0]['href'],
+                              'is_playable': False})
+        return items
 
 
     def get_next_page(self, url, bs):
@@ -258,4 +282,20 @@ def download_video_page(url):
             return [ismms.get_download_url(url)]
         except TypeError as e:
             print e
+
+def get_categories(url):
+    ig = None
+
+    if (re.search(r'^http://www.indiangilma.com/', str(url)) or
+        re.search(r'^http://indiangilma.com/', str(url))):
+        ig = IG()
+    elif (re.search(r'^http://pornfay.com', str(url)) or
+          re.search(r'^http://www.pornfay.com', str(url))):
+        ig = PFay()
+    elif (re.search(r'^http://mastishare.com', str(url)) or
+          re.search(r'^http://www.mastishare.com', str(url))):
+        ig = MShare()
+
+    if ig:
+        return ig.category_page(str(url))
 
