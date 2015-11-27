@@ -34,19 +34,22 @@ def show_category(cat):
     plugin.log.debug(cat)
     items, next_page = download_index_page(cat)
     for item in items:
-        item['path'] = plugin.url_for('show_video', vidpage=item['path'])
-    next_page_item = {'label': 'Next page',
-                      'path': plugin.url_for('show_category',
-                                             cat=next_page)}
-    items.append(next_page_item)
+        item['path'] = plugin.url_for('show_video',
+                                      vidpage=item['path'].encode('utf-8'))
+    if next_page:
+        next_page_item = {'label': 'Next page',
+                          'path': plugin.url_for('show_category',
+                                                 cat=next_page)}
+        items.append(next_page_item)
     return plugin.finish(items)
 
 
 @plugin.route('/video/<vidpage>')
 def show_video(vidpage):
     item = download_video_page(vidpage)
+    plugin.log.debug(item)
     if item:
-        return plugin.finish(item)
+        plugin.play_video(item)
 
 
 def get_generes(site):

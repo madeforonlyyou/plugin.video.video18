@@ -34,18 +34,21 @@ class IG(Scrapper):
 
     def get_next_page(self, url, bs):
         ul = bs.findAll('ul', {'class': 'pagination pagination-lg'})
-        page = ul[0].findAll('li',
-                             {'class': 'active'},
-                             limit=1)[0]('span')[0].text
+        if not ul:
+            return None
+        page = ul[0].findAll('li', {'class': 'active'}, limit=1)
+        if page:
+            page = page[0]('span')[0].text
+        else:
+            return None
         next_page_no = int(page) + 1
         parsed_url = urlparse(url)
         pqs = parse_qs(parsed_url.query)
         pqs['page'] = [str(next_page_no)]
         query_list = []
-        for k,v in pqs.items():
-            query_list.append('%s=%s' % (k,v[0]))
+        for k, v in pqs.items():
+            query_list.append('%s=%s' % (k, v[0]))
         return parsed_url._replace(query="&".join(query_list))
-
 
     def index_page(self, url):
         items = []
@@ -57,11 +60,14 @@ class IG(Scrapper):
                           'path': self.site + div('a')[0]['href'],
                           'thumbnail': self.site + div('a')[0]('img')[0]['src'],
                           'is_playable': False})
-        return items, urlunparse(self.get_next_page(url, bs))
+        next_page = self.get_next_page(url, bs)
+        if next_page:
+            next_page = urlunparse(next_page)
+        return items, next_page
 
     def category_page(self, url):
         items = []
-        code, page =self.download_page(url)
+        code, page = self.download_page(url)
         if code == 200:
             bs = BeautifulSoup(page)
             divs = bs.findAll('div', {'class': "col-sm-6 col-md-4 col-lg-4 m-b-20"})
@@ -71,7 +77,6 @@ class IG(Scrapper):
                               'thumbnail': self.site + div('a')[0]('div')[0]('img')[0]['src'],
                               'is_playable': False})
         return items
-
 
     def get_download_url(self, text):
         """ gets the url from the xml"""
@@ -90,7 +95,7 @@ class IG(Scrapper):
                 }
         return item
 
-    def get_id(self,url):
+    def get_id(self, url):
         """ Gets the video id from  the url
 
         Sample url:
@@ -153,6 +158,8 @@ class MShare(IG):
 
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'currentpage'})
+        if not span:
+            return None
         page_next  = int(span[0].text) + 1
         next_page_no = int(page_next) + 1
         parsed_url = urlparse(url)
@@ -275,11 +282,11 @@ def download_video_page(url):
             source = ig.config_url % str(vid)
             code, text = ig.download_page(source)
             durl = ig.get_download_url(text)
-            return [durl]
+            return durl
     else:
         ismms = ISMMS()
         try:
-            return [ismms.get_download_url(url)]
+            return ismms.get_download_url(url)
         except TypeError as e:
             print e
 
