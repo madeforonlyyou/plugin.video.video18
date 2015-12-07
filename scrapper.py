@@ -70,7 +70,8 @@ class IG(Scrapper):
         code, page = self.download_page(url)
         if code == 200:
             bs = BeautifulSoup(page)
-            divs = bs.findAll('div', {'class': "col-sm-6 col-md-4 col-lg-4 m-b-20"})
+            divs = bs.findAll('div',
+                              {'class': "col-sm-6 col-md-4 col-lg-4 m-b-20"})
             for div in divs:
                 items.append({'label': div('a')[0]('div')[0]('img')[0]['title'],
                               'path': self.site + div('a')[0]['href'],
@@ -192,6 +193,28 @@ class ISMMS(Scrapper):
         super(ISMMS, self).__init__()
         self.site = 'http://indiansexmms.co/'
 
+    def _digit_to_char(self, digit):
+        if digit < 10:
+            return str(digit)
+        return chr(ord('a') + digit - 10)
+
+    def _str_base(self, number,base):
+        if number < 0:
+            return '-' + self._str_base(-number, base)
+        (d, m) = divmod(number, base)
+        if d > 0:
+            return self._str_base(d, base) + self._digit_to_char(m)
+        return self._digit_to_char(m)
+
+    def unpack(self, p, a, c, k, e, d):
+        e = lambda c: self._str_base(c, 36)
+        while c:
+            c = c-1
+            d[self._str_base(c, a)] = k[c] or self._str_base(c, a)
+
+        return re.sub(r'\b(\w+)\b', lambda m: d[m.groups()[0]], p)
+
+
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'current'})
         page_next  = int(span[0].text) + 1
@@ -237,11 +260,27 @@ class ISMMS(Scrapper):
                 plugin.log.debug("Unexpected redirect with code: %s for url %s" % (code, iframe_text))
                 return (None, None)
             bs = BeautifulSoup(iframe_text)
+            s = iframe_text
+            try:
+                s = s.replace('\n', '')
+                args = re.findall(r'return p\}\((.+)\)\)\s+', s)[0]
+                p1,p2,a,c,k,e,d = args.split(',')
+                if k.endswith('.split(\'|\')'):
+                    print "It ends with split"
+                    unpacked = self.unpack(p1+p2,
+                                           int(a),
+                                           int(c),
+                                           eval(k),
+                                           int(e),
+                                           {})
+            except Exception as e:
+                plugin.log.info("Couldn't unpack video playback url" , e)
+                pass
+
             item['thumbnail'] = bs.findAll('video')[0]['poster']
-            for source in bs('source'):
-                if hasattr(source, 'src'):
-                    item['path'] = source['src'].strip()
+            item['path'] = re.findall(r'(http\:.+)\"\);', unpacked)[0]
             item['is_playable'] = True
+            plugin.log.info(item)
             return item
         except AttributeError as e:
             plugin.log.debug(e)
