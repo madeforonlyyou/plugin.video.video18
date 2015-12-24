@@ -4,7 +4,7 @@ from scrapper import download_video_page, download_index_page, get_categories
 
 
 SUPPORTED_SITES = ['pornfay.com', 'indiangilma.com', 'mastishare.com',
-                   'http://indiansexmms.co/']
+                   'http://indiansexmms.co/', 'naughtymachinima.com']
 plugin = Plugin()
 
 if plugin.get_setting('enable_debug', bool):
@@ -65,7 +65,7 @@ def get_generes(site):
 def get_site_category(site):
     cat = []
     if (site == 'indiangilma.com' or site == 'pornfay.com' or
-            site == 'mastishare.com'):
+            site == 'mastishare.com' or site == 'naughtymachinima.com'):
         categories = {'Most Recent': 'http://www.%s/videos?o=mr' % site,
                       'Being Watched': 'http://%s/videos?o=bw' % site,
                       'Most viewed': 'http://www.%s/videos?o=mv' % site,

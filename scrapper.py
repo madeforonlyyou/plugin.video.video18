@@ -56,10 +56,13 @@ class IG(Scrapper):
         bs = BeautifulSoup(page)
         divs = bs.findAll('div', {'class': "col-sm-6 col-md-4 col-lg-4"})
         for div in divs:
+            thumb_url = div('a')[0]('img')[0]['src'] + '|referer=' + url
             items.append({'label': div('a')[0]('img')[0]['title'],
                           'path': self.site + div('a')[0]['href'],
-                          'thumbnail': self.site + div('a')[0]('img')[0]['src'],
+                          'thumbnail': thumb_url if thumb_url.startswith(self.site) else self.site + thumb_url,
                           'is_playable': False})
+        plugin.log.debug(items[0])
+        plugin.log.info(items[0])
         next_page = self.get_next_page(url, bs)
         if next_page:
             next_page = urlunparse(next_page)
@@ -79,7 +82,7 @@ class IG(Scrapper):
                               'is_playable': False})
         return items
 
-    def get_download_url(self, text):
+    def get_download_url(self, text, ref=None):
         """ gets the url from the xml"""
         try:
             xmldoc = minidom.parseString(text)
@@ -111,6 +114,7 @@ class IG(Scrapper):
             plugin.log.debug("Problem with the url. Unsupported site?")
             return None
 
+
 class PFay(IG):
     def __init__(self):
         super(PFay, self).__init__()
@@ -118,13 +122,39 @@ class PFay(IG):
                            "key=%s-1-1")
         self.site = 'http://pornfay.com'
 
+
+class NMachinima(IG):
+    def __init__(self):
+        super(NMachinima, self).__init__()
+        self.config_url = ("http://www.naughtymachinima.com/media/player/"
+                           "config.php?vkey=%s-1-1")
+        self.site = 'http://www.naughtymachinima.com'
+
+    def get_download_url(self, text, ref=None):
+        """ gets the url from the xml"""
+        try:
+            xmldoc = minidom.parseString(text)
+            src = xmldoc.getElementsByTagName('src')
+            thumb = xmldoc.getElementsByTagName('image')
+        except:
+            plugin.log.debug('Cannot download video: config.php error')
+            return []
+        if src[0].firstChild.data:
+            path = src[0].firstChild.data + '|referer=' + ref
+        item = {'path': path,
+                'thumbnail': thumb[1].firstChild.data,
+                'is_playable': True,
+                }
+        return item
+
+
 class MShare(IG):
     def __init__(self):
         super(MShare, self).__init__()
         self.site = 'http://mastishare.com/'
         self.config_url = 'http://www.mastishare.com/media/nuevo/playlist.php?key=%s'
 
-    def get_download_url(self, text):
+    def get_download_url(self, text, ref=None):
         """ gets the url from the xml"""
         try:
             xmldoc = minidom.parseString(text)
@@ -142,10 +172,9 @@ class MShare(IG):
                 }
         return item
 
-
     def category_page(self, url):
         items = []
-        code, page =self.download_page(url)
+        code, page = self.download_page(url)
         if code == 200:
             bs = BeautifulSoup(page)
             h2_divs = bs.findAll('div', {'class': "btopl"})
@@ -156,19 +185,18 @@ class MShare(IG):
                               'is_playable': False})
         return items
 
-
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'currentpage'})
         if not span:
             return None
-        page_next  = int(span[0].text) + 1
+        page_next = int(span[0].text) + 1
         next_page_no = int(page_next) + 1
         parsed_url = urlparse(url)
         pqs = parse_qs(parsed_url.query)
         pqs['page'] = [str(next_page_no)]
         query_list = []
-        for k,v in pqs.items():
-            query_list.append('%s=%s' % (k,v[0]))
+        for k, v in pqs.items():
+            query_list.append('%s=%s' % (k, v[0]))
         return parsed_url._replace(query="&".join(query_list))
 
         page_next_url = '/page/%s/' % page_next
@@ -198,7 +226,7 @@ class ISMMS(Scrapper):
             return str(digit)
         return chr(ord('a') + digit - 10)
 
-    def _str_base(self, number,base):
+    def _str_base(self, number, base):
         if number < 0:
             return '-' + self._str_base(-number, base)
         (d, m) = divmod(number, base)
@@ -207,17 +235,15 @@ class ISMMS(Scrapper):
         return self._digit_to_char(m)
 
     def unpack(self, p, a, c, k, e, d):
-        e = lambda c: self._str_base(c, 36)
         while c:
             c = c-1
             d[self._str_base(c, a)] = k[c] or self._str_base(c, a)
 
         return re.sub(r'\b(\w+)\b', lambda m: d[m.groups()[0]], p)
 
-
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'current'})
-        page_next  = int(span[0].text) + 1
+        page_next = int(span[0].text) + 1
         page_next_url = '/page/%s/' % page_next
         page_next = self.site + page_next_url
         return page_next
@@ -236,8 +262,7 @@ class ISMMS(Scrapper):
             items.append(item)
         return items, self.get_next_page(url, bs)
 
-
-    def get_download_url(self, source):
+    def get_download_url(self, source, ref=None):
         plugin.log.debug("Getting download url %s" % source)
         code, page = self.download_page(source)
         iframe_url = None
@@ -264,7 +289,7 @@ class ISMMS(Scrapper):
             try:
                 s = s.replace('\n', '')
                 args = re.findall(r'return p\}\((.+)\)\)\s+', s)[0]
-                p1,p2,a,c,k,e,d = args.split(',')
+                p1, p2, a, c, k, e, d = args.split(',')
                 if k.endswith('.split(\'|\')'):
                     print "It ends with split"
                     unpacked = self.unpack(p1+p2,
@@ -274,7 +299,7 @@ class ISMMS(Scrapper):
                                            int(e),
                                            {})
             except Exception as e:
-                plugin.log.info("Couldn't unpack video playback url" , e)
+                plugin.log.info("Couldn't unpack video playback url", e)
                 pass
 
             item['thumbnail'] = bs.findAll('video')[0]['poster']
@@ -290,24 +315,28 @@ class ISMMS(Scrapper):
 def download_index_page(url):
     ig = None
     if (re.search(r'^http://www.indiangilma.com/', url) or
-        re.search(r'^http://indiangilma.com/', url)):
+            re.search(r'^http://indiangilma.com/', url)):
         ig = IG()
     elif (re.search(r'^http://pornfay.com', url) or
-          re.search(r'^http://www.pornfay.com', url)):
+            re.search(r'^http://www.pornfay.com', url)):
         ig = PFay()
     elif (re.search(r'^http://mastishare.com', url) or
-          re.search(r'^http://www.mastishare.com', url)):
+            re.search(r'^http://www.mastishare.com', url)):
         ig = MShare()
+    elif (re.search(r'^http://naughtymachinima.com', str(url)) or
+            re.search(r'^http://www.naughtymachinima.com', str(url))):
+        ig = NMachinima()
     if ig:
         return ig.index_page(url)
     else:
         ismms = ISMMS()
         return ismms.index_page(url)
 
+
 def download_video_page(url):
     ig = None
     if (re.search(r'^http://www.indiangilma.com/', url) or
-        re.search(r'^http://indiangilma.com/', url)):
+            re.search(r'^http://indiangilma.com/', url)):
         ig = IG()
     elif (re.search(r'^http://pornfay.com', url) or
           re.search(r'^http://www.pornfay.com', url)):
@@ -315,12 +344,16 @@ def download_video_page(url):
     elif (re.search(r'^http://mastishare.com', url) or
           re.search(r'^http://www.mastishare.com', url)):
         ig = MShare()
+    elif (re.search(r'^http://naughtymachinima.com', str(url)) or
+            re.search(r'^http://www.naughtymachinima.com', str(url))):
+        ig = NMachinima()
+
     if ig:
         vid = ig.get_id(url)
         if vid:
             source = ig.config_url % str(vid)
             code, text = ig.download_page(source)
-            durl = ig.get_download_url(text)
+            durl = ig.get_download_url(text, ref=url)
             return durl
     else:
         ismms = ISMMS()
@@ -329,19 +362,22 @@ def download_video_page(url):
         except TypeError as e:
             print e
 
+
 def get_categories(url):
     ig = None
 
     if (re.search(r'^http://www.indiangilma.com/', str(url)) or
-        re.search(r'^http://indiangilma.com/', str(url))):
+            re.search(r'^http://indiangilma.com/', str(url))):
         ig = IG()
     elif (re.search(r'^http://pornfay.com', str(url)) or
-          re.search(r'^http://www.pornfay.com', str(url))):
+            re.search(r'^http://www.pornfay.com', str(url))):
         ig = PFay()
     elif (re.search(r'^http://mastishare.com', str(url)) or
-          re.search(r'^http://www.mastishare.com', str(url))):
+            re.search(r'^http://www.mastishare.com', str(url))):
         ig = MShare()
+    elif (re.search(r'^http://naughtymachinima.com', str(url)) or
+            re.search(r'^http://www.naughtymachinima.com', str(url))):
+        ig = NMachinima()
 
     if ig:
         return ig.category_page(str(url))
-
