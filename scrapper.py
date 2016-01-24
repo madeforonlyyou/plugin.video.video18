@@ -53,6 +53,10 @@ class IG(Scrapper):
     def index_page(self, url):
         items = []
         code, page = self.download_page(url)
+        if code != 200:
+            plugin.log.debug("Error retriving url: %s", code)
+            return items, None
+
         bs = BeautifulSoup(page)
         divs = bs.findAll('div', {'class': "col-sm-6 col-md-4 col-lg-4"})
         for div in divs:
@@ -206,6 +210,9 @@ class MShare(IG):
     def index_page(self, url):
         items = []
         code, page = self.download_page(url)
+        if code != 200:
+            plugin.log.debug("Unable to download index page, code: %s", code)
+            return items, None
         bs = BeautifulSoup(page)
         divs = bs.findAll('div', {'class': 'video_box'})
         for div in divs:
@@ -251,6 +258,9 @@ class ISMMS(Scrapper):
     def index_page(self, url):
         items = []
         code, page = self.download_page(url)
+        if code != 200:
+            plugin.log.debug("Unable to download index page, code: %s", code)
+            return items, None
         bs = BeautifulSoup(page)
         divs_post = bs.findAll('div', {'class': 'post'})
         for div in divs_post:
@@ -353,6 +363,9 @@ def download_video_page(url):
         if vid:
             source = ig.config_url % str(vid)
             code, text = ig.download_page(source)
+            if code != 200:
+                plugin.log.debug("Unable to download url, %s", code)
+                return None
             durl = ig.get_download_url(text, ref=url)
             return durl
     else:
