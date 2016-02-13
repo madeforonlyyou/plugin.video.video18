@@ -2,6 +2,7 @@ from xbmcswift2 import Plugin
 from xml.dom import minidom
 import re
 import requests
+import traceback
 from requests.utils import urlparse, urlunparse
 from urlparse import parse_qs
 from BeautifulSoup import BeautifulSoup
@@ -126,6 +127,78 @@ class PFay(IG):
                            "key=%s-1-1")
         self.site = 'http://pornfay.com'
 
+    def get_download_url(self, text, ref=None):
+        """ gets the url from the xml"""
+        try:
+            xmldoc = minidom.parseString(text)
+            src = xmldoc.getElementsByTagName('html5')
+            thumb = xmldoc.getElementsByTagName('thumb')
+            title = xmldoc.getElementsByTagName('title')
+            if not src:
+                src = xmldoc.getElementsByTagName('file')
+        except:
+            plugin.log.debug('Cannot download video: config.php error')
+            return []
+        item = {'path': src[0].firstChild.data,
+                'thumbnail': thumb[0].firstChild.data,
+                'label': title[0].firstChild.data,
+                'is_playable': True,
+                }
+        return item
+
+
+class StubeDesi(IG):
+    def __init__(self):
+        super(StubeDesi, self).__init__()
+        self.site = 'http://sextube.desi'
+
+    def get_download_url(self, url, ref=None):
+        """ gets the url from the xml"""
+        code, text = self.download_page(url)
+        if code != 200:
+            return {}
+        try:
+            m = re.search(r'file\:\"(.+)\"', text)
+            if m:
+                durl = m.groups()[0]
+                item = {'path': durl,
+                        'is_playable': True}
+                plugin.log.info(durl)
+                return item
+        except Exception as e:
+            plugin.log.info("Error getting video url %s", e)
+            traceback.print_exc()
+            pass
+        return {}
+
+    def index_page(self, url):
+        items = []
+        code, page = self.download_page(url)
+        if code != 200:
+            plugin.log.debug("Unable to download index page, code: %s", code)
+            return items, None
+        bs = BeautifulSoup(page)
+        a_last_row = bs.findAll('a', {'class': 'video-box statisticBox rotatingThumbBox videoBox\nvideo-box_last-in-row\n'})
+        a_others = bs.findAll('a', {'class': 'video-box statisticBox rotatingThumbBox videoBox\n'})
+        for a in a_others:
+            items.append({'label': a.text,
+                          'path': self.site + a.attrMap['href'].strip(),
+                          'thumbnail': a.findAll('img', {'class': "videoBoxImg rotatingThumb"})[0].attrMap['src'],
+                          'is_playable': False})
+        for a in a_last_row:
+            items.append({'label': a.text,
+                          'path': self.site + a.attrMap['href'].strip(),
+                          'thumbnail': a.findAll('img', {'class': "videoBoxImg rotatingThumb"})[0].attrMap['src'],
+                          'is_playable': False})
+        return items, self.get_next_page(bs)
+
+
+    def get_next_page(self, bs):
+        next_page = int(bs.findAll('a', {'class': 'btn default-btn page-num current-page'})[0].text) + 1
+        return self.site + '/' + 'page%d.html' % next_page
+
+
+
 
 class NMachinima(IG):
     def __init__(self):
@@ -133,6 +206,7 @@ class NMachinima(IG):
         self.config_url = ("http://www.naughtymachinima.com/media/player/"
                            "config.php?vkey=%s-1-1")
         self.site = 'http://www.naughtymachinima.com'
+
 
     def get_download_url(self, text, ref=None):
         """ gets the url from the xml"""
@@ -241,10 +315,13 @@ class ISMMS(Scrapper):
             return self._str_base(d, base) + self._digit_to_char(m)
         return self._digit_to_char(m)
 
+    def _decode(self, c, a):
+        return ('' if c < a else self._decode(c / a)) + (chr(c + 29) if c % a > 35 else self. _str_base(c, 36))
+
     def unpack(self, p, a, c, k, e, d):
         while c:
             c = c-1
-            d[self._str_base(c, a)] = k[c] or self._str_base(c, a)
+            d[self._decode(c, a)] = k[c] or self._decode(c, a)
 
         return re.sub(r'\b(\w+)\b', lambda m: d[m.groups()[0]], p)
 
@@ -299,21 +376,21 @@ class ISMMS(Scrapper):
             try:
                 s = s.replace('\n', '')
                 args = re.findall(r'return p\}\((.+)\)\)\s+', s)[0]
-                p1, p2, a, c, k, e, d = args.split(',')
+                p1, p2, p3, p4, p5, a, c, k, e, d = args.split(',')
                 if k.endswith('.split(\'|\')'):
-                    print "It ends with split"
-                    unpacked = self.unpack(p1+p2,
+                    unpacked = self.unpack(','.join([p1, p2, p3, p4, p5]),
                                            int(a),
                                            int(c),
                                            eval(k),
                                            int(e),
                                            {})
             except Exception as e:
-                plugin.log.info("Couldn't unpack video playback url", e)
-                pass
+                plugin.log.info("Couldn't unpack video playback url: %s", e)
+                traceback.print_exc()
+                return {}
 
             item['thumbnail'] = bs.findAll('video')[0]['poster']
-            item['path'] = re.findall(r'(http\:.+)\"\);', unpacked)[0]
+            item['path'] = re.findall(r'(http\:.+)\"\)', unpacked)[0]
             item['is_playable'] = True
             plugin.log.info(item)
             return item
@@ -336,6 +413,8 @@ def download_index_page(url):
     elif (re.search(r'^http://naughtymachinima.com', str(url)) or
             re.search(r'^http://www.naughtymachinima.com', str(url))):
         ig = NMachinima()
+    elif(re.search(r'^http://sextube.desi', str(url))):
+        ig = StubeDesi()
     if ig:
         return ig.index_page(url)
     else:
@@ -345,6 +424,7 @@ def download_index_page(url):
 
 def download_video_page(url):
     ig = None
+    st = None
     if (re.search(r'^http://www.indiangilma.com/', url) or
             re.search(r'^http://indiangilma.com/', url)):
         ig = IG()
@@ -357,6 +437,8 @@ def download_video_page(url):
     elif (re.search(r'^http://naughtymachinima.com', str(url)) or
             re.search(r'^http://www.naughtymachinima.com', str(url))):
         ig = NMachinima()
+    elif(re.search(r'^http://sextube.desi', str(url))):
+        st = StubeDesi()
 
     if ig:
         vid = ig.get_id(url)
@@ -368,6 +450,12 @@ def download_video_page(url):
                 return None
             durl = ig.get_download_url(text, ref=url)
             return durl
+
+    elif st:
+            try:
+                return st.get_download_url(url)
+            except TypeError as e:
+                print e
     else:
         ismms = ISMMS()
         try:
@@ -391,6 +479,8 @@ def get_categories(url):
     elif (re.search(r'^http://naughtymachinima.com', str(url)) or
             re.search(r'^http://www.naughtymachinima.com', str(url))):
         ig = NMachinima()
+    elif(re.search(r'^http://sextube.desi', str(url))):
+        ig = StubeDesi()
 
     if ig:
         return ig.category_page(str(url))

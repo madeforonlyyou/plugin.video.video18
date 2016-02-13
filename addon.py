@@ -4,7 +4,8 @@ from scrapper import download_video_page, download_index_page, get_categories
 
 
 SUPPORTED_SITES = ['pornfay.com', 'indiangilma.com',
-                   'http://indiansexmms.co/', 'naughtymachinima.com']
+                   'http://indiansexmms.co/', 'naughtymachinima.com',
+                   'sextube.desi']
 plugin = Plugin()
 
 if plugin.get_setting('enable_debug', bool):
@@ -79,6 +80,16 @@ def get_site_category(site):
                         'is_playable': False})
         items = get_generes(site)
         cat = cat + items
+    elif (site == 'sextube.desi'):
+        categories = {'Top rated': 'http://%s/top-rated/' % site,
+                      'Most Viewed': 'http://%s/most-viewed/' % site,
+                      'Most Viewed Week': 'http://%s/most-viewed-week/' % site,
+                      'Most Viewed Month': 'http://%s/most-viewed-month/' % site,
+                      'Longest': 'http://%s/longest/' % site}
+        for label, path in categories.items():
+            cat.append({'label': label,
+                        'path': plugin.url_for('show_category', cat=path),
+                        'is_playable': False})
     elif site == 'http://indiansexmms.co/':
         items, next_page = download_index_page(site)
         for item in items:
