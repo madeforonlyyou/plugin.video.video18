@@ -5,7 +5,6 @@ This addon currently supports following websites
     - indiansexmms.co
     - indiangilma.com
     - naughtymachinima.com
-    - pornfay.com
     - sextube.desi
 
 ## Donate
