@@ -3,7 +3,7 @@ from xbmcswift2 import logger
 from scrapper import download_video_page, download_index_page, get_categories
 
 
-SUPPORTED_SITES = ['pornfay.com', 'indiangilma.com',
+SUPPORTED_SITES = ['indiangilma.com',
                    'http://indiansexmms.co/', 'naughtymachinima.com',
                    'sextube.desi']
 plugin = Plugin()
