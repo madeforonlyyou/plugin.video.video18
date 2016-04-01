@@ -368,9 +368,6 @@ class ISMMS(Scrapper):
             else:
                 plugin.log.debug("Could not find iframe url from page")
                 return (None, None)
-            if code != 302:
-                plugin.log.debug("Unexpected redirect with code: %s for url %s" % (code, iframe_text))
-                return (None, None)
             bs = BeautifulSoup(iframe_text)
             s = iframe_text
             try:
