@@ -67,12 +67,12 @@ def get_site_category(site):
     cat = []
     if (site == 'indiangilma.com' or site == 'pornfay.com' or
             site == 'mastishare.com' or site == 'naughtymachinima.com'):
-        categories = {'Most Recent': 'http://www.%s/videos?o=mr' % site,
+        categories = {'Most Recent': 'http://%s/videos?o=mr' % site,
                       'Being Watched': 'http://%s/videos?o=bw' % site,
-                      'Most viewed': 'http://www.%s/videos?o=mv' % site,
-                      'Longest': 'http://www.%s/videos?o=lg' % site,
-                      'Top Favorites': 'http://www.%s/videos?o=tf' % site,
-                      'Top Rated': 'http://www.%s/videos?o=tr' % site}
+                      'Most viewed': 'http://%s/videos?o=mv' % site,
+                      'Longest': 'http://%s/videos?o=lg' % site,
+                      'Top Favorites': 'http://%s/videos?o=tf' % site,
+                      'Top Rated': 'http://%s/videos?o=tr' % site}
 
         for label, path in categories.items():
             cat.append({'label': label,
@@ -84,7 +84,7 @@ def get_site_category(site):
         categories = {'Top rated': 'http://%s/top-rated/' % site,
                       'Most Viewed': 'http://%s/most-viewed/' % site,
                       'Most Viewed Week': 'http://%s/most-viewed-week/' % site,
-                      'Most Viewed Month': 'http://%s/most-viewed-month/' % site,
+                      'Most Viewed Mon': 'http://%s/most-viewed-month/' % site,
                       'Longest': 'http://%s/longest/' % site}
         for label, path in categories.items():
             cat.append({'label': label,
@@ -98,12 +98,12 @@ def get_site_category(site):
                                                vidpage=item['path']),
                         'thumbnail': item['thumbnail'],
                         'is_playable': False})
-        next_page_item = {'label': 'Next Page',
-                          'path': plugin.url_for('show_category',
-                                                 cat=next_page),
-                          'is_playable': False
-                          }
-        cat.append(next_page_item)
+        if next_page:
+            next_page_item = {'label': 'Next Page',
+                              'path': plugin.url_for('show_category',
+                                                     cat=next_page),
+                              'is_playable': False}
+            cat.append(next_page_item)
 
     return cat
 

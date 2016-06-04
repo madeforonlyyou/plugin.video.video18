@@ -22,7 +22,11 @@ class Scrapper(object):
 
     def download_page(self, url, **kwargs):
         """ uses to get the xml source from website """
-        res = self.req.get(url, **kwargs)
+        try:
+            res = self.req.get(url, **kwargs)
+        except Exception as e:
+            plugin.log.debug(e)
+            return (None, None)
         return (res.status_code, res.text)
 
 
