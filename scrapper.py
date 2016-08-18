@@ -10,8 +10,8 @@ from BeautifulSoup import BeautifulSoup
 
 plugin = Plugin()
 
-headers = {'User-Agent': 'Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:41.0) '
-                         'Gecko/20100101 Firefox/41.0',
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) '
+                         'Gecko/20100101 Firefox/40.1',
            'Accept-Encoding': 'identity, deflate'}
 
 
@@ -196,12 +196,9 @@ class StubeDesi(IG):
                           'is_playable': False})
         return items, self.get_next_page(bs)
 
-
     def get_next_page(self, bs):
         next_page = int(bs.findAll('a', {'class': 'btn default-btn page-num current-page'})[0].text) + 1
         return self.site + '/' + 'page%d.html' % next_page
-
-
 
 
 class NMachinima(IG):
@@ -210,7 +207,6 @@ class NMachinima(IG):
         self.config_url = ("http://www.naughtymachinima.com/media/player/"
                            "config.php?vkey=%s-1-1")
         self.site = 'http://www.naughtymachinima.com'
-
 
     def get_download_url(self, text, ref=None):
         """ gets the url from the xml"""
@@ -339,10 +335,10 @@ class ISMMS(Scrapper):
     def index_page(self, url):
         items = []
         code, page = self.download_page(url)
-        if code != 200:
-            plugin.log.debug("Unable to download index page, code: %s", code)
+        try:
+            bs = BeautifulSoup(page)
+        except Exception:
             return items, None
-        bs = BeautifulSoup(page)
         divs_post = bs.findAll('div', {'class': 'post'})
         for div in divs_post:
             item = {'path': div('a')[0]['href'],
