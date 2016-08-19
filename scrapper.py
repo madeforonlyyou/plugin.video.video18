@@ -357,9 +357,6 @@ class ISMMS(Scrapper):
         plugin.log.debug("Getting download url %s" % source)
         code, page = self.download_page(source)
         iframe_url = None
-        if code != 200:
-            plugin.log.debug("cannot download page: %s" % source)
-            return (None, None)
         try:
             item = {}
             bs = BeautifulSoup(page)
@@ -393,7 +390,6 @@ class ISMMS(Scrapper):
             item['thumbnail'] = bs.findAll('video')[0]['poster']
             item['path'] = re.findall(r'(http\:.+)\"\)', unpacked)[0]
             item['is_playable'] = True
-            plugin.log.info(item)
             return item
         except AttributeError as e:
             plugin.log.debug(e)
