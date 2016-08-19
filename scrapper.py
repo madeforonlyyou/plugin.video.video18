@@ -337,17 +337,21 @@ class ISMMS(Scrapper):
         code, page = self.download_page(url)
         try:
             bs = BeautifulSoup(page)
-        except Exception:
-            return items, None
-        divs_post = bs.findAll('div', {'class': 'post'})
-        for div in divs_post:
-            item = {'path': div('a')[0]['href'],
-                    'thumbnail': div('img')[0]['src'],
-                    'label': div('a')[0]['title'],
-                    'is_playable': False,
-                    }
-            items.append(item)
-        return items, self.get_next_page(url, bs)
+            divs_post = bs.findAll('div', {'class': 'post'})
+            for div in divs_post:
+                thumb = div('img')[0]['src'] if len(div('img')) else ''
+                label = div('a')[0]['title'] if len(div('a')) else 'No title'
+                item = {'path': div('a')[0]['href'],
+                        'thumbnail': thumb,
+                        'label': label,
+                        'is_playable': False,
+                        }
+                items.append(item)
+            return items, self.get_next_page(url, bs)
+        except Exception as e:
+            plugin.log.info(e)
+            plugin.log.info(page)
+            return items,None
 
     def get_download_url(self, source, ref=None):
         plugin.log.debug("Getting download url %s" % source)
