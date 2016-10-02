@@ -14,6 +14,8 @@ headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) '
                          'Gecko/20100101 Firefox/40.1',
            'Accept-Encoding': 'identity, deflate'}
 
+_OLOAD_URL = r'https?://openload\.(?:co|io)/(?:f|embed)/(?P<id>[a-zA-Z0-9-_]+)'
+
 
 class Scrapper(object):
     def __init__(self):
@@ -25,6 +27,7 @@ class Scrapper(object):
         try:
             res = self.req.get(url, **kwargs)
         except Exception as e:
+            plugin.log.debug("unable to download: %s", url)
             plugin.log.debug(e)
             return (None, None)
         return (res.status_code, res.text)
@@ -316,7 +319,7 @@ class ISMMS(Scrapper):
         return self._digit_to_char(m)
 
     def _decode(self, c, a):
-        return ('' if c < a else self._decode(c / a)) + (chr(c + 29) if c % a > 35 else self. _str_base(c, 36))
+        return ('' if c < a else self._decode(c / a)) + (chr(c + 29) if c % a > 35 else self. _str_base(c, 36)) # noqa
 
     def unpack(self, p, a, c, k, e, d):
         while c:
@@ -324,6 +327,35 @@ class ISMMS(Scrapper):
             d[self._decode(c, a)] = k[c] or self._decode(c, a)
 
         return re.sub(r'\b(\w+)\b', lambda m: d[m.groups()[0]], p)
+
+    # borrowed from youtbe-dl
+    def _extract_oload(self, webpage):
+
+        plugin.log.debug("extracting video url oload")
+        if 'File not found' in webpage or 'deleted by the owner' in webpage:
+            raise ExtractorError('File not found', expected=True)
+
+        # The following decryption algorithm is written by @yokrysty and
+        # declared to be freely used in youtube-dl
+        # See https://github.com/rg3/youtube-dl/issues/10408
+        pattern = re.compile(r'<span[^>]*>([^<]+)</span>\s*<span[^>]*>[^<]+</span>\s*<span[^>]+id="streamurl"') # noqa
+        m = re.search(pattern, webpage)
+        plugin.log.debug("match: %s" % m)
+        enc_data = next(g for g in m.groups() if g is not None)
+        video_url_chars = []
+
+        for idx, c in enumerate(enc_data):
+            j = compat_ord(c)
+            if j >= 33 and j <= 126:
+                j = ((j + 14) % 94) + 33
+            if idx == len(enc_data) - 1:
+                j += 2
+            video_url_chars += chr(j)
+
+        video_url = 'https://openload.co/stream/%s?mime=true' % ''.join(video_url_chars)
+        plugin.log.debug(video_url)
+        return video_url
+
 
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'current'})
@@ -362,10 +394,25 @@ class ISMMS(Scrapper):
             bs = BeautifulSoup(page)
             for iframe in bs('iframe'):
                 if re.search(r'^http://up2stream.com/view', iframe['src']):
+                    plugin.log.debug("Up2stream")
                     iframe_url = iframe['src']
+                elif re.search(r'^https://openload.co/embed', iframe['src']):
+                    plugin.log.debug("oload: %s", iframe['src'])
+                    iframe_url = iframe['src']
+                    oload_re = re.compile(_OLOAD_URL)
+                    m = oload_re.match(iframe['src'])
+                    video_id = m.group('id')
+                    plugin.log.debug("Video_ID: %s", video_id)
+                    code, webpage = self.download_page('https://openload.co/embed/%s/' % video_id) # noqa
+                    plugin.log.debug("Code=%s", code) # noqa
+                    video_url = self._extract_oload(webpage)
+                    if video_url:
+                        return {'path': video_url+"|referer=%s" % iframe['src'],
+                                'is_playable': True}
             item['label'] = bs('title')[0].text.split('|')[0]
             if iframe_url:
                 code, iframe_text = self.download_page(iframe_url, allow_redirects=False)
+
             else:
                 plugin.log.debug("Could not find iframe url from page")
                 return (None, None)
@@ -417,6 +464,12 @@ def download_index_page(url):
     else:
         ismms = ISMMS()
         return ismms.index_page(url)
+
+def compat_ord(c):
+    if type(c) is int:
+        return c
+    else:
+        return ord(c)
 
 
 def download_video_page(url):
