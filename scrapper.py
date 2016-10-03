@@ -396,7 +396,24 @@ class ISMMS(Scrapper):
                 if re.search(r'^http://up2stream.com/view', iframe['src']):
                     plugin.log.debug("Up2stream")
                     iframe_url = iframe['src']
+                elif re.search(r'^http://vidlox.tv/embed', iframe['src']):
+                    video_url = None
+                    plugin.log.debug("vidlox: %s", iframe['src'])
+                    code,webpage = self.download_page(iframe['src'])
+                    plugin.log.debug("code: %s", code)
+                    vid_re = re.compile(r'\{file\:"(http\:\/\/[a-z0-9\/\.]+v.mp4)"')
+                    m = re.search(vid_re, webpage)
+                    if m:
+                        video_url = m.groups()[0]
+                    else:
+                        plugin.log.debug("vidlox: match not found")
+
+                    if video_url:
+                        return {'path': video_url+"|referer=%s" % iframe['src'],
+                                'is_playable': True}
+
                 elif re.search(r'^https://openload.co/embed', iframe['src']):
+                    continue
                     plugin.log.debug("oload: %s", iframe['src'])
                     iframe_url = iframe['src']
                     oload_re = re.compile(_OLOAD_URL)
