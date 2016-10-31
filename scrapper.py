@@ -3,6 +3,7 @@ from xml.dom import minidom
 import re
 import requests
 import traceback
+import urlresolver
 from requests.utils import urlparse, urlunparse
 from urlparse import parse_qs
 from BeautifulSoup import BeautifulSoup
@@ -13,8 +14,7 @@ plugin = Plugin()
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) '
                          'Gecko/20100101 Firefox/40.1',
            'Accept-Encoding': 'identity, deflate'}
-
-_OLOAD_URL = r'https?://openload\.(?:co|io)/(?:f|embed)/(?P<id>[a-zA-Z0-9-_]+)'
+ipad = 'Mozilla/5.0 (iPhone; U; CPU iPhone OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.20 (KHTML, like Gecko) Mobile/7B298g'  # noqa
 
 
 class Scrapper(object):
@@ -71,7 +71,7 @@ class IG(Scrapper):
             thumb_url = div('a')[0]('img')[0]['src'] + '|referer=' + url
             items.append({'label': div('a')[0]('img')[0]['title'],
                           'path': self.site + div('a')[0]['href'],
-                          'thumbnail': thumb_url if thumb_url.startswith(self.site) else self.site + thumb_url,
+                          'thumbnail': thumb_url if thumb_url.find(self.site_name) != -1 else self.site + thumb_url,
                           'is_playable': False})
         plugin.log.debug(items[0])
         plugin.log.info(items[0])
@@ -319,7 +319,7 @@ class ISMMS(Scrapper):
         return self._digit_to_char(m)
 
     def _decode(self, c, a):
-        return ('' if c < a else self._decode(c / a)) + (chr(c + 29) if c % a > 35 else self. _str_base(c, 36)) # noqa
+        return ('' if c < a else self._decode(c / a)) + (chr(c + 29) if c % a > 35 else self. _str_base(c, 36))  # noqa
 
     def unpack(self, p, a, c, k, e, d):
         while c:
@@ -327,35 +327,6 @@ class ISMMS(Scrapper):
             d[self._decode(c, a)] = k[c] or self._decode(c, a)
 
         return re.sub(r'\b(\w+)\b', lambda m: d[m.groups()[0]], p)
-
-    # borrowed from youtbe-dl
-    def _extract_oload(self, webpage):
-
-        plugin.log.debug("extracting video url oload")
-        if 'File not found' in webpage or 'deleted by the owner' in webpage:
-            raise ExtractorError('File not found', expected=True)
-
-        # The following decryption algorithm is written by @yokrysty and
-        # declared to be freely used in youtube-dl
-        # See https://github.com/rg3/youtube-dl/issues/10408
-        pattern = re.compile(r'<span[^>]*>([^<]+)</span>\s*<span[^>]*>[^<]+</span>\s*<span[^>]+id="streamurl"') # noqa
-        m = re.search(pattern, webpage)
-        plugin.log.debug("match: %s" % m)
-        enc_data = next(g for g in m.groups() if g is not None)
-        video_url_chars = []
-
-        for idx, c in enumerate(enc_data):
-            j = compat_ord(c)
-            if j >= 33 and j <= 126:
-                j = ((j + 14) % 94) + 33
-            if idx == len(enc_data) - 1:
-                j += 2
-            video_url_chars += chr(j)
-
-        video_url = 'https://openload.co/stream/%s?mime=true' % ''.join(video_url_chars)
-        plugin.log.debug(video_url)
-        return video_url
-
 
     def get_next_page(self, url, bs):
         span = bs.findAll('span', {'class': 'current'})
@@ -383,7 +354,7 @@ class ISMMS(Scrapper):
         except Exception as e:
             plugin.log.info(e)
             plugin.log.info(page)
-            return items,None
+            return items, None
 
     def get_download_url(self, source, ref=None):
         plugin.log.debug("Getting download url %s" % source)
@@ -396,35 +367,28 @@ class ISMMS(Scrapper):
                 if re.search(r'^http://up2stream.com/view', iframe['src']):
                     plugin.log.debug("Up2stream")
                     iframe_url = iframe['src']
-                elif re.search(r'^http://vidlox.tv/embed', iframe['src']):
-                    video_url = None
-                    plugin.log.debug("vidlox: %s", iframe['src'])
-                    code,webpage = self.download_page(iframe['src'])
-                    plugin.log.debug("code: %s", code)
-                    vid_re = re.compile(r'\{file\:"(http\:\/\/[a-z0-9\/\.]+v.mp4)"')
-                    m = re.search(vid_re, webpage)
-                    if m:
-                        video_url = m.groups()[0]
-                    else:
-                        plugin.log.debug("vidlox: match not found")
-
-                    if video_url:
-                        return {'path': video_url+"|referer=%s" % iframe['src'],
-                                'is_playable': True}
+#                elif re.search(r'^http://vidlox.tv/embed', iframe['src']):
+#                    video_url = None
+#                    plugin.log.debug("vidlox: %s", iframe['src'])
+#                    code,webpage = self.download_page(iframe['src'])
+#                    plugin.log.debug("code: %s", code)
+#                    vid_re = re.compile(r'\{file\:"(http\:\/\/[a-z0-9\/\.]+v.mp4)"')
+#                    m = re.search(vid_re, webpage)
+#                    if m:
+#                        video_url = m.groups()[0]
+#                    else:
+#                        plugin.log.debug("vidlox: match not found")
+#
+#                    if video_url:
+#                        url = video_url+'|User-Agent=%s&Referer=%s' % (ipad,source)
+#                        return {'path': url,
+#                               'is_playable': True}
 
                 elif re.search(r'^https://openload.co/embed', iframe['src']):
-                    continue
-                    plugin.log.debug("oload: %s", iframe['src'])
-                    iframe_url = iframe['src']
-                    oload_re = re.compile(_OLOAD_URL)
-                    m = oload_re.match(iframe['src'])
-                    video_id = m.group('id')
-                    plugin.log.debug("Video_ID: %s", video_id)
-                    code, webpage = self.download_page('https://openload.co/embed/%s/' % video_id) # noqa
-                    plugin.log.debug("Code=%s", code) # noqa
-                    video_url = self._extract_oload(webpage)
-                    if video_url:
-                        return {'path': video_url+"|referer=%s" % iframe['src'],
+                    video = urlresolver.resolve(iframe['src'])
+                    plugin.log.debug("Video=%s", video)  # noqa
+                    if video:
+                        return {'path': video+"|referer=%s" % iframe['src'],
                                 'is_playable': True}
             item['label'] = bs('title')[0].text.split('|')[0]
             if iframe_url:
@@ -481,6 +445,7 @@ def download_index_page(url):
     else:
         ismms = ISMMS()
         return ismms.index_page(url)
+
 
 def compat_ord(c):
     if type(c) is int:
